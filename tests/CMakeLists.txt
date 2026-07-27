@@ -14,6 +14,7 @@ include_directories(${CMAKE_SOURCE_DIR}/tests/lib/googletest/include)
 # Add an executable target for tests
 add_executable(TESTS
         findJourneys.cpp # Add test files
+        parallelRaptor.cpp
 )
 
 # Link Google Test libraries and project files

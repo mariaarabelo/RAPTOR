@@ -35,29 +35,77 @@ void Raptor::setQuery(const Query &query) {
   query_ = query;
 }
 
+namespace {
+  // Maximum walking distance (km) for which a footpath transfer is considered.
+  // Beyond this, transit will always be faster than walking, so no pair beyond
+  // this range can ever contribute to a Pareto-optimal journey.
+  constexpr double kMaxFootpathDistanceKm = 3.0;
+  constexpr double kKmPerDegree = 111.0; // matches the scaling factor used in Utils::getDuration
+
+  struct GridCellHash {
+    std::size_t operator()(const std::pair<long, long> &cell) const {
+      return std::hash<long>()(cell.first) ^ (std::hash<long>()(cell.second) << 1);
+    }
+  };
+}
+
 void Raptor::initializeFootpaths() {
   // Initialize footpaths
   std::cout << "Initializing footpaths..." << std::endl;
   auto start_time = std::chrono::high_resolution_clock::now();
 
-  // Avoid duplicating calculations for both sides
-  for (auto it1 = stops_.begin(); it1 != stops_.end(); ++it1) {
-    const std::string &id1 = it1->first;
-    Stop &stop1 = it1->second;
+  // Bucket stops into a uniform grid sized to the max footpath distance, so
+  // that each stop only needs to be compared against nearby stops (the ones
+  // that could possibly be within walking range) instead of every other stop.
+  const double cell_size_deg = kMaxFootpathDistanceKm / kKmPerDegree;
 
-    // Start the inner loop from the next element
-    for (auto it2 = std::next(it1); it2 != stops_.end(); ++it2) {
-      const std::string &id2 = it2->first; // stop_id
-      Stop &stop2 = it2->second; // stop itself
+  struct StopCoord {
+    std::string id;
+    double lat{};
+    double lon{};
+  };
 
-      // Calculate duration between the two stops
-      int duration = Utils::getDuration(
-              stop1.getField("stop_lat"), stop1.getField("stop_lon"),
-              stop2.getField("stop_lat"), stop2.getField("stop_lon"));
+  std::vector<StopCoord> coords;
+  coords.reserve(stops_.size());
+  for (auto &[id, stop]: stops_)
+    coords.push_back({id, std::stod(stop.getField("stop_lat")), std::stod(stop.getField("stop_lon"))});
 
-      // Add footpaths in both directions
-      stop1.addFootpath(id2, duration);
-      stop2.addFootpath(id1, duration);
+  auto cellOf = [&](double lat, double lon) -> std::pair<long, long> {
+    return {static_cast<long>(std::floor(lat / cell_size_deg)), static_cast<long>(std::floor(lon / cell_size_deg))};
+  };
+
+  std::unordered_map<std::pair<long, long>, std::vector<size_t>, GridCellHash> grid;
+  for (size_t i = 0; i < coords.size(); ++i)
+    grid[cellOf(coords[i].lat, coords[i].lon)].push_back(i);
+
+  // A cell size equal to the max distance guarantees any stop within range
+  // falls in the same or an immediately adjacent cell, so a 3x3 neighborhood
+  // search is enough to find every candidate.
+  for (size_t i = 0; i < coords.size(); ++i) {
+    auto [cx, cy] = cellOf(coords[i].lat, coords[i].lon);
+
+    for (long dx = -1; dx <= 1; ++dx) {
+      for (long dy = -1; dy <= 1; ++dy) {
+        auto it = grid.find({cx + dx, cy + dy});
+        if (it == grid.end()) continue;
+
+        for (size_t j: it->second) {
+          if (j <= i) continue; // process each unordered pair exactly once
+
+          double manhattan_deg = std::abs(coords[i].lat - coords[j].lat) + std::abs(coords[i].lon - coords[j].lon);
+          if (manhattan_deg * kKmPerDegree > kMaxFootpathDistanceKm) continue;
+
+          Stop &stop1 = stops_[coords[i].id];
+          Stop &stop2 = stops_[coords[j].id];
+
+          int duration = Utils::getDuration(
+                  stop1.getField("stop_lat"), stop1.getField("stop_lon"),
+                  stop2.getField("stop_lat"), stop2.getField("stop_lon"));
+
+          stop1.addFootpath(coords[j].id, duration);
+          stop2.addFootpath(coords[i].id, duration);
+        }
+      }
     }
   }
 
