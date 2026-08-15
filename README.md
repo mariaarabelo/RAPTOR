@@ -82,7 +82,7 @@ doxygen Doxyfile
 - **tests/**: Directory for test files and Google Test submodule.
 - **docs/**: Contains the Doxygen configuration file for generating documentation.
 
-This repository is developed as part of my internship at OPT (Optimizações e Planeamento de Transporte). 
+This was initiated as part of my internship at OPT (Optimizações e Planeamento de Transporte). 
 
 ### References
 - Delling, Daniel, Thomas Pajor, Renato F. Werneck, “Round-based Public Transit Routing.” Microsoft Research (2012). https://www.microsoft.com/en-us/research/wp-content/uploads/2012/01/raptor_alenex.pdf
