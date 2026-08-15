@@ -12,11 +12,14 @@ endif()
 
 include_directories(.)
 
+find_package(Threads REQUIRED)
+
 add_subdirectory(tests)
 
 add_library(raptor_lib
         src/Parser.cpp
         src/Raptor.cpp
+        src/ParallelRaptor.cpp
         src/Utils.cpp
         src/Application.cpp
         src/DateTime.h
@@ -31,6 +34,7 @@ add_library(raptor_lib
 )
 
 target_include_directories(raptor_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(raptor_lib PUBLIC Threads::Threads)
 
 add_executable(raptor src/main.cpp)
 target_link_libraries(raptor raptor_lib)

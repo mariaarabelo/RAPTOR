@@ -184,7 +184,12 @@ TEST_F(RaptorTests, from5726_to5739) {
 
 /**
  * @test from5746_to5756
- * @brief Tests a journey from stop 5746 to 5756 at 05:05.
+ * @brief Tests a query from stop 5746 (Povoa de Varzim) to 5756 (Castelo da Maia) at 05:05 on a Sunday.
+ *
+ * No journey exists: the two stops are ~28km apart with no direct transit link at that
+ * hour, and footpaths are only generated between stops within realistic walking range
+ * (see kMaxFootpathDistanceKm in Raptor.cpp), so an implausible multi-hour walk is no
+ * longer offered as a result.
  */
 TEST_F(RaptorTests, from5746_to5756) {
   Query query = {"5746", "5756", {2024, 5, 5}, {5, 5, 0}};
@@ -192,9 +197,7 @@ TEST_F(RaptorTests, from5746_to5756) {
 
   auto journeys = raptor.findJourneys();
 
-  ASSERT_FALSE(journeys.empty());
-  for (auto &journey: journeys)
-    ASSERT_TRUE(raptor.isValidJourney(journey));
+  ASSERT_TRUE(journeys.empty());
 }
 
 /**
